@@ -95,8 +95,6 @@ struct OVCore : WeakSingleton<OVCore> {
 
   std::vector<std::string> GetAvailableDevices() const;
   std::vector<std::string> GetAvailableDevices(const std::string& device_type) const;
-  void SetCache(const std::string& cache_dir_path);
-  void SetStreams(const std::string& device_type, int num_streams);
 };
 
 class OVExeNetwork {
@@ -158,8 +156,11 @@ class StatefulOVInferRequest : public OVInferRequest {
   void RewindKVCache(size_t index) override;
   void FillTensor(const std::string& tensor_name, const ov::element::Type& type,
                   const std::vector<size_t>& shape, int32_t fill_value);
+  void CacheTensor_float(const std::string& tensor_name, std::vector<float>& cache);
   void CacheTensor(const std::string& tensor_name, std::vector<int64_t>& cache);
   void SetTensorFromCache(const std::string& tensor_name, const std::vector<int64_t>& cache_data);
+  void SetTensorFromCache_float(const std::string& tensor_name, const std::vector<float>& cache_data);
+
   std::optional<ov::Tensor> FindTensor(const std::string& tensor_name);
 
  private:
@@ -169,7 +170,7 @@ class StatefulOVInferRequest : public OVInferRequest {
   // If prefill_use_full_chat_history is true, cache the "input_ids" & "position_ids" tensors,
   // and ensure that full chat history is passed for each prefill call.
   bool prefill_use_full_chat_history = false;
-  std::vector<int64_t> cached_input_ids;
+  std::vector<float> cached_input_ids;
   std::vector<int64_t> cached_position_ids;
 };
 

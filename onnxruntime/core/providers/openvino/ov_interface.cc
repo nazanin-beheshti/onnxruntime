@@ -270,10 +270,6 @@ OVExeNetwork OVCore::ImportEPCtxOVIREncapsulation(std::istream& model_stream,
                              "Exception while Loading Network from OVIR model file: {}", model_file_path.string());
 }
 
-void OVCore::SetCache(const std::string& cache_dir_path) {
-  core.set_property(ov::cache_dir(cache_dir_path));
-}
-
 std::vector<std::string> OVCore::GetAvailableDevices() const {
   std::vector<std::string> available_devices = core.get_available_devices();
   return available_devices;
@@ -310,10 +306,6 @@ std::vector<std::string> OVCore::GetAvailableDevices(const std::string& device_t
   }
 
   return available_devices;
-}
-
-void OVCore::SetStreams(const std::string& device_type, int num_streams) {
-  core.set_property(device_type, {ov::num_streams(num_streams)});
 }
 
 std::shared_ptr<OVInferRequest> OVExeNetwork::CreateInferRequest() {
@@ -388,6 +380,13 @@ void StatefulOVInferRequest::CacheTensor(const std::string& tensor_name, std::ve
     cache.emplace_back(pData[i]);
   }
 }
+void StatefulOVInferRequest::CacheTensor_float(const std::string& tensor_name, std::vector<float>& cache) {
+  auto tensor = ovInfReq.get_tensor(tensor_name);
+  auto* pData = tensor.data<float>();
+  for (size_t i = 0; i < tensor.get_size(); i++) {
+    cache.emplace_back(pData[i]);
+  }
+}
 
 void StatefulOVInferRequest::SetTensorFromCache(const std::string& tensor_name,
                                                 const std::vector<int64_t>& cache_data) {
@@ -398,6 +397,19 @@ void StatefulOVInferRequest::SetTensorFromCache(const std::string& tensor_name,
   auto new_tensor = ov::Tensor(tensor.get_element_type(), new_shape);
   auto* pNewData = new_tensor.data<int64_t>();
   std::memcpy(pNewData, cache_data.data(), cache_data.size() * sizeof(int64_t));
+
+  ovInfReq.set_tensor(tensor_name, new_tensor);
+}
+
+void StatefulOVInferRequest::SetTensorFromCache_float(const std::string& tensor_name,
+                                                const std::vector<float>& cache_data) {
+  auto tensor = ovInfReq.get_tensor(tensor_name);
+  auto new_shape = tensor.get_shape();
+  //new_shape[1] = cache_data.size();
+
+  auto new_tensor = ov::Tensor(tensor.get_element_type(), new_shape);
+  auto* pNewData = new_tensor.data<float>();
+  std::memcpy(pNewData, cache_data.data(), cache_data.size() * sizeof(float));
 
   ovInfReq.set_tensor(tensor_name, new_tensor);
 }
@@ -429,8 +441,12 @@ void StatefulOVInferRequest::PreProcessInferRequest() {
 
   // If 'prefill use full chat history' mode is enabled, we need to cache input_ids and position_ids.
   if (prefill_use_full_chat_history) {
-    auto input_ids_tensor = ovInfReq.get_tensor("input_ids");
-    CacheTensor("input_ids", cached_input_ids);
+    
+    //auto input_ids_tensor = ovInfReq.get_tensor("input_ids");
+    //CacheTensor("input_ids", cached_input_ids);
+
+    auto input_ids_tensor = ovInfReq.get_tensor("input_hidden_states");
+    CacheTensor_float("input_hidden_states", cached_input_ids);
 
     // "position_ids" (GQA with Rotary Embeddings doesnt have position_ids) - check if exists
     auto position_ids_opt = FindTensor("position_ids");
@@ -449,7 +465,8 @@ void StatefulOVInferRequest::PreProcessInferRequest() {
         ovInfReq.reset_state();
 
         // Set tensors using cached values
-        SetTensorFromCache("input_ids", cached_input_ids);
+        //SetTensorFromCache("input_ids", cached_input_ids);
+        SetTensorFromCache_float("input_hidden_states", cached_input_ids);
 
         // Only set position_ids if it exists and we have cached values
         if (has_position_ids && !cached_position_ids.empty()) {

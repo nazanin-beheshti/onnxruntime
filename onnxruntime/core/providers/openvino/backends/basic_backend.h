@@ -57,6 +57,7 @@ struct OnnxToOvNetworkBindings {
       "beam_idx",
       "past_key_values",
       "present",
+      "total_seq_len",
   };
 
   OnnxToOvNetworkBindings(OVExeNetwork& exec_network, SubGraphContext& subgraph_context, SessionContext& session_context) {
@@ -72,7 +73,7 @@ struct OnnxToOvNetworkBindings {
         // stateful representation has introduced these new tensors, creating a name mismatch (matched_names=false).
         // So, if there is a name mismatch, or the name matches our special io list, we simply continue processing
         // here to prevent runtime exceptions.
-        if (session_context.enable_causallm) {
+        //if (session_context.enable_causallm) {
           if (!matched_names ||
               std::any_of(special_io_names_.begin(), special_io_names_.end(),
                           [&onnx_name](const std::string& name) { return onnx_name.find(name) != std::string::npos; })) {
@@ -80,7 +81,7 @@ struct OnnxToOvNetworkBindings {
             has_dynamic_io_ = true;
             continue;
           }
-        }
+        //}
 
         ORT_ENFORCE(matched_names, log_tag,
                     "Input names mismatch between OpenVINO and ONNX. ", onnx_name,
@@ -142,9 +143,9 @@ class BasicBackend : public IBackend {
  private:
   bool ValidateSubgraph(std::map<std::string, std::shared_ptr<ov::Node>>& const_outputs_map);
   void PopulateConfigValue(ov::AnyMap& device_config);
-  void EnableCaching();
+  void EnableCaching(ov::AnyMap& device_config);
   void EnableGPUThrottling(ov::AnyMap& device_config);
-  void EnableStreams();
+  void EnableStreams(ov::AnyMap& device_config);
   void SetNumThreads(ov::AnyMap& device_config);
   void SetOVDeviceConfiguration(ov::AnyMap& device_config);
   void ValidateOrtDimsAgainstPartialShape(const std::vector<int64_t>& ort_dims,
