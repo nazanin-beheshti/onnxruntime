@@ -422,14 +422,14 @@ struct OpenVINOProviderFactory : IExecutionProviderFactory {
       }
     }
 
-    if (provider_options.find("device_type") == provider_options.end()) {
+    auto effective_provider_options = provider_options;
+    if (effective_provider_options.find("device_type") == effective_provider_options.end()) {
         // Preserve the device selected during factory creation unless the session-level
         // OpenVINO provider options explicitly override it.
-        provider_options["device_type"] = provider_info_.device_type;
+        effective_provider_options.emplace("device_type", provider_info_.device_type);
     }
-
     ProviderInfo provider_info = provider_info_;
-    ParseProviderInfo(provider_options, &config_options, provider_info);
+    ParseProviderInfo(effective_provider_options, &config_options, provider_info);
     ParseConfigOptions(provider_info);
 
     auto ov_ep = std::make_unique<OpenVINOExecutionProvider>(provider_info);
